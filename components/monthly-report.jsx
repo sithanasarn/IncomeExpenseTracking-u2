@@ -1,19 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  Bar,
-  BarChart,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  Sector,
-} from "recharts"
+import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from "recharts"
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -27,23 +15,38 @@ import { toast } from "@/components/ui/use-toast"
 
 const COLORS = ["#4ade80", "#60a5fa", "#f87171", "#facc15", "#a78bfa", "#fb923c", "#94a3b8", "#f472b6"]
 
-// Custom tooltip component with improved styling
-const CustomTooltip = ({ active, payload }) => {
+// Custom tooltip component with improved styling and contrast
+const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
+    // For bar charts
+    if (label) {
+      return (
+        <div className="custom-tooltip bg-[#0f1015] border border-[#4ade80] p-3 rounded-md shadow-lg">
+          <p className="font-medium text-white mb-1">Day: {label}</p>
+          {payload.map((entry, index) => (
+            <p key={index} style={{ color: entry.color }} className="font-medium">
+              {entry.name}: ${Number(entry.value).toFixed(2)}
+            </p>
+          ))}
+        </div>
+      )
+    }
+
+    // For pie charts
     const data = payload[0].payload
     return (
-      <div className="custom-tooltip bg-[#1c1c2a] border border-[#2a2a3c] p-3 rounded-md shadow-lg">
-        <p className="font-medium text-white">{data.category || data.name}</p>
-        <p className="text-emerald-400">${Number(data.amount || data.value).toFixed(2)}</p>
-        {data.percent && <p className="text-gray-300">{data.percent.toFixed(1)}%</p>}
+      <div className="custom-tooltip bg-[#0f1015] border border-[#4ade80] p-3 rounded-md shadow-lg">
+        <p className="font-medium text-white mb-1">{data.category}</p>
+        <p className="text-emerald-400 font-bold">${Number(data.amount).toFixed(2)}</p>
+        <p className="text-white">{(data.percent * 100).toFixed(1)}%</p>
       </div>
     )
   }
   return null
 }
 
-// Custom label for pie chart segments
-const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+// Custom label for pie chart segments - showing ONLY percentage
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
   // Only show label if segment is large enough (more than 5%)
   if (percent < 0.05) return null
 
@@ -53,39 +56,19 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
   const y = cy + radius * Math.sin(-midAngle * RADIAN)
 
   return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-medium">
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="text-xs font-bold"
+      stroke="#000"
+      strokeWidth={0.5}
+      paintOrder="stroke"
+    >
       {`${(percent * 100).toFixed(0)}%`}
     </text>
-  )
-}
-
-// Custom active shape for the pie chart
-const renderActiveShape = (props) => {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props
-
-  return (
-    <g>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={outerRadius + 6}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-        stroke={fill}
-        strokeWidth={2}
-      />
-      <text x={cx} y={cy} dy={-20} textAnchor="middle" fill="#fff" className="text-sm">
-        {payload.category}
-      </text>
-      <text x={cx} y={cy} textAnchor="middle" fill="#fff" className="text-base font-medium">
-        ${Number(value).toFixed(2)}
-      </text>
-      <text x={cx} y={cy} dy={20} textAnchor="middle" fill="#4ade80" className="text-sm">
-        {`${(percent * 100).toFixed(1)}%`}
-      </text>
-    </g>
   )
 }
 
@@ -97,8 +80,6 @@ export function MonthlyReport() {
     dailyTransactions: [],
   })
   const [loading, setLoading] = useState(true)
-  const [activeIncomeIndex, setActiveIncomeIndex] = useState(0)
-  const [activeExpenseIndex, setActiveExpenseIndex] = useState(0)
 
   useEffect(() => {
     async function loadReportData() {
@@ -143,14 +124,6 @@ export function MonthlyReport() {
   const totalExpenses = reportData.expenses.reduce((sum, item) => sum + Number(item.amount), 0)
   const balance = totalIncome - totalExpenses
   const savingsRate = totalIncome > 0 ? Math.round((balance / totalIncome) * 100) : 0
-
-  const onIncomeEnter = (_, index) => {
-    setActiveIncomeIndex(index)
-  }
-
-  const onExpenseEnter = (_, index) => {
-    setActiveExpenseIndex(index)
-  }
 
   if (loading) {
     return <div className="py-10 text-center">Loading report data...</div>
@@ -257,11 +230,7 @@ export function MonthlyReport() {
                       axisLine={false}
                       tickFormatter={(value) => `$${value}`}
                     />
-                    <Tooltip
-                      content={<CustomTooltip />}
-                      formatter={(value) => [`$${value.toFixed(2)}`, ""]}
-                      labelFormatter={(label) => `Day: ${label}`}
-                    />
+                    <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="income" fill="#4ade80" radius={[4, 4, 0, 0]} name="Income" />
                     <Bar dataKey="expenses" fill="#f87171" radius={[4, 4, 0, 0]} name="Expenses" />
                     <Legend />
@@ -288,8 +257,6 @@ export function MonthlyReport() {
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
-                        activeIndex={activeIncomeIndex}
-                        activeShape={renderActiveShape}
                         data={reportData.income}
                         cx="50%"
                         cy="50%"
@@ -299,14 +266,18 @@ export function MonthlyReport() {
                         fill="#8884d8"
                         dataKey="amount"
                         nameKey="category"
-                        onMouseEnter={onIncomeEnter}
                       >
                         {reportData.income.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip content={<CustomTooltip />} />
-                      <Legend />
+                      <Legend
+                        formatter={(value, entry, index) => <span className="text-sm text-white">{value}</span>}
+                        layout="horizontal"
+                        verticalAlign="bottom"
+                        align="center"
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -361,8 +332,6 @@ export function MonthlyReport() {
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
-                        activeIndex={activeExpenseIndex}
-                        activeShape={renderActiveShape}
                         data={reportData.expenses}
                         cx="50%"
                         cy="50%"
@@ -372,14 +341,18 @@ export function MonthlyReport() {
                         fill="#8884d8"
                         dataKey="amount"
                         nameKey="category"
-                        onMouseEnter={onExpenseEnter}
                       >
                         {reportData.expenses.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip content={<CustomTooltip />} />
-                      <Legend />
+                      <Legend
+                        formatter={(value, entry, index) => <span className="text-sm text-white">{value}</span>}
+                        layout="horizontal"
+                        verticalAlign="bottom"
+                        align="center"
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 )}

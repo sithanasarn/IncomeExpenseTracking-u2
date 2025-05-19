@@ -153,11 +153,12 @@ header.scrolled {
   backdrop-filter: blur(4px);
 }
 
-/* Custom tooltip styling */
+/* Custom tooltip styling with improved visibility */
 .custom-tooltip {
-  z-index: 50;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(74, 222, 128, 0.3);
+  z-index: 9999 !important;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.7) !important;
+  border: 1px solid rgba(74, 222, 128, 0.5) !important;
+  pointer-events: none;
 }
 
 /* Ensure recharts components have proper z-index */
@@ -166,14 +167,26 @@ header.scrolled {
 }
 
 .recharts-tooltip-wrapper {
-  z-index: 1000 !important;
+  z-index: 9999 !important;
   pointer-events: none;
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.5));
 }
 
 .recharts-default-tooltip {
-  background-color: #1c1c2a !important;
-  border: 1px solid #2a2a3c !important;
+  background-color: #0f1015 !important;
+  border: 1px solid #4ade80 !important;
   border-radius: 0.375rem !important;
   padding: 0.75rem !important;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5) !important;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Improve pie chart label visibility */
+.recharts-pie-label-text {
+  font-weight: bold !important;
+  text-shadow: 0px 0px 2px #000 !important;
+}
+
+/* Override recharts legend text color */
+.recharts-legend-item-text {
+  color: white !important;
 }

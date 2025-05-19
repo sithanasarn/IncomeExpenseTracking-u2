@@ -1,58 +1,28 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Pie, PieChart, ResponsiveContainer, Cell, Legend, Tooltip, Sector } from "recharts"
+import { Pie, PieChart, ResponsiveContainer, Cell, Legend, Tooltip } from "recharts"
 import { toast } from "@/components/ui/use-toast"
 
 const COLORS = ["#4ade80", "#60a5fa", "#f87171", "#facc15", "#a78bfa", "#fb923c", "#94a3b8", "#f472b6"]
 
-// Custom tooltip component with improved styling
+// Custom tooltip component with improved styling and contrast
 const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload
     return (
-      <div className="custom-tooltip bg-[#1c1c2a] border border-[#2a2a3c] p-3 rounded-md shadow-lg">
-        <p className="font-medium text-white">{data.name}</p>
-        <p className="text-emerald-400">${Number(data.value).toFixed(2)}</p>
-        <p className="text-gray-300">{data.percent.toFixed(1)}%</p>
+      <div className="custom-tooltip bg-[#0f1015] border border-[#4ade80] p-3 rounded-md shadow-lg">
+        <p className="font-medium text-white mb-1">{data.name}</p>
+        <p className="text-emerald-400 font-bold">${Number(data.value).toFixed(2)}</p>
+        <p className="text-white">{(data.percent * 100).toFixed(1)}%</p>
       </div>
     )
   }
   return null
 }
 
-// Custom active shape for the pie chart that shows percentage
-const renderActiveShape = (props) => {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props
-
-  return (
-    <g>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={outerRadius + 6}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-        stroke={fill}
-        strokeWidth={2}
-      />
-      <text x={cx} y={cy} dy={-20} textAnchor="middle" fill="#fff" className="text-sm">
-        {payload.name}
-      </text>
-      <text x={cx} y={cy} textAnchor="middle" fill="#fff" className="text-base font-medium">
-        ${Number(value).toFixed(2)}
-      </text>
-      <text x={cx} y={cy} dy={20} textAnchor="middle" fill="#4ade80" className="text-sm">
-        {`${(percent * 100).toFixed(1)}%`}
-      </text>
-    </g>
-  )
-}
-
-// Custom label for pie chart segments
-const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }) => {
+// Custom label for pie chart segments - showing ONLY percentage
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
   // Only show label if segment is large enough (more than 5%)
   if (percent < 0.05) return null
 
@@ -62,7 +32,17 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
   const y = cy + radius * Math.sin(-midAngle * RADIAN)
 
   return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-medium">
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="text-xs font-bold"
+      stroke="#000"
+      strokeWidth={0.5}
+      paintOrder="stroke"
+    >
       {`${(percent * 100).toFixed(0)}%`}
     </text>
   )
@@ -71,7 +51,6 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
 export function MonthlyStats() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeIndex, setActiveIndex] = useState(0)
 
   useEffect(() => {
     async function fetchMonthlyStats() {
@@ -135,10 +114,6 @@ export function MonthlyStats() {
     fetchMonthlyStats()
   }, [])
 
-  const onPieEnter = (_, index) => {
-    setActiveIndex(index)
-  }
-
   if (loading) {
     return <div className="h-[350px] flex items-center justify-center">Loading monthly stats...</div>
   }
@@ -164,8 +139,6 @@ export function MonthlyStats() {
       <ResponsiveContainer width="100%" height={350}>
         <PieChart>
           <Pie
-            activeIndex={activeIndex}
-            activeShape={renderActiveShape}
             data={data}
             cx="50%"
             cy="50%"
@@ -175,7 +148,6 @@ export function MonthlyStats() {
             fill="#8884d8"
             dataKey="value"
             strokeWidth={1}
-            onMouseEnter={onPieEnter}
           >
             {data.map((entry, index) => (
               <Cell
@@ -187,7 +159,12 @@ export function MonthlyStats() {
             ))}
           </Pie>
           <Tooltip content={<CustomTooltip />} />
-          <Legend formatter={(value, entry, index) => <span className="text-sm text-gray-300">{value}</span>} />
+          <Legend
+            formatter={(value, entry, index) => <span className="text-sm text-white">{value}</span>}
+            layout="horizontal"
+            verticalAlign="bottom"
+            align="center"
+          />
         </PieChart>
       </ResponsiveContainer>
     </div>
