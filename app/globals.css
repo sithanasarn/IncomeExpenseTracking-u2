@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 355.7 100% 97.3%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 142 76% 36%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 142 70% 50%;
+    --primary-foreground: 144.9 80.4% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 50.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 142 76% 36%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom neon effects */
+.neon-glow {
+  box-shadow: 0 0 10px theme("colors.emerald.500"), 0 0 20px rgba(74, 222, 128, 0.2);
+}
+
+.neon-text {
+  text-shadow: 0 0 5px theme("colors.emerald.500"), 0 0 10px rgba(74, 222, 128, 0.3);
+}
+
+.neon-border {
+  border: 1px solid theme("colors.emerald.500");
+  box-shadow: 0 0 5px theme("colors.emerald.500"), 0 0 10px rgba(74, 222, 128, 0.2);
+}
+
+.income-glow {
+  box-shadow: 0 0 10px theme("colors.emerald.500"), 0 0 20px rgba(74, 222, 128, 0.2);
+}
+
+.expense-glow {
+  box-shadow: 0 0 10px theme("colors.rose.500"), 0 0 20px rgba(244, 63, 94, 0.2);
+}
+
+.glass-effect {
+  background: rgba(17, 17, 23, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tech-pattern {
+  background-image: radial-gradient(circle at 25px 25px, rgba(74, 222, 128, 0.15) 2%, transparent 0%),
+    radial-gradient(circle at 75px 75px, rgba(74, 222, 128, 0.1) 2%, transparent 0%);
+  background-size: 100px 100px;
+}
+
+.grid-pattern {
+  background-size: 40px 40px;
+  background-image: linear-gradient(to right, rgba(74, 222, 128, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(74, 222, 128, 0.05) 1px, transparent 1px);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--secondary));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
+}
