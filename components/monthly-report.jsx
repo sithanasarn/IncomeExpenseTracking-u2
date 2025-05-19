@@ -1,7 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from "recharts"
+import {
+  Bar,
+  BarChart,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  Sector,
+} from "recharts"
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -15,6 +27,68 @@ import { toast } from "@/components/ui/use-toast"
 
 const COLORS = ["#4ade80", "#60a5fa", "#f87171", "#facc15", "#a78bfa", "#fb923c", "#94a3b8", "#f472b6"]
 
+// Custom tooltip component with improved styling
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload
+    return (
+      <div className="custom-tooltip bg-[#1c1c2a] border border-[#2a2a3c] p-3 rounded-md shadow-lg">
+        <p className="font-medium text-white">{data.category || data.name}</p>
+        <p className="text-emerald-400">${Number(data.amount || data.value).toFixed(2)}</p>
+        {data.percent && <p className="text-gray-300">{data.percent.toFixed(1)}%</p>}
+      </div>
+    )
+  }
+  return null
+}
+
+// Custom label for pie chart segments
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+  // Only show label if segment is large enough (more than 5%)
+  if (percent < 0.05) return null
+
+  const RADIAN = Math.PI / 180
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-medium">
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  )
+}
+
+// Custom active shape for the pie chart
+const renderActiveShape = (props) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props
+
+  return (
+    <g>
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 6}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+        stroke={fill}
+        strokeWidth={2}
+      />
+      <text x={cx} y={cy} dy={-20} textAnchor="middle" fill="#fff" className="text-sm">
+        {payload.category}
+      </text>
+      <text x={cx} y={cy} textAnchor="middle" fill="#fff" className="text-base font-medium">
+        ${Number(value).toFixed(2)}
+      </text>
+      <text x={cx} y={cy} dy={20} textAnchor="middle" fill="#4ade80" className="text-sm">
+        {`${(percent * 100).toFixed(1)}%`}
+      </text>
+    </g>
+  )
+}
+
 export function MonthlyReport() {
   const [date, setDate] = useState(new Date())
   const [reportData, setReportData] = useState({
@@ -23,6 +97,8 @@ export function MonthlyReport() {
     dailyTransactions: [],
   })
   const [loading, setLoading] = useState(true)
+  const [activeIncomeIndex, setActiveIncomeIndex] = useState(0)
+  const [activeExpenseIndex, setActiveExpenseIndex] = useState(0)
 
   useEffect(() => {
     async function loadReportData() {
@@ -31,6 +107,22 @@ export function MonthlyReport() {
         const month = date.getMonth() + 1 // JavaScript months are 0-indexed
 
         const data = await getMonthlyReportData(year, month)
+
+        // Calculate percentages for pie charts
+        const totalIncome = data.income.reduce((sum, item) => sum + Number(item.amount), 0)
+        const totalExpenses = data.expenses.reduce((sum, item) => sum + Number(item.amount), 0)
+
+        // Add percent property to each item
+        data.income = data.income.map((item) => ({
+          ...item,
+          percent: totalIncome > 0 ? Number(item.amount) / totalIncome : 0,
+        }))
+
+        data.expenses = data.expenses.map((item) => ({
+          ...item,
+          percent: totalExpenses > 0 ? Number(item.amount) / totalExpenses : 0,
+        }))
+
         setReportData(data)
       } catch (error) {
         console.error("Error loading report data:", error)
@@ -51,6 +143,14 @@ export function MonthlyReport() {
   const totalExpenses = reportData.expenses.reduce((sum, item) => sum + Number(item.amount), 0)
   const balance = totalIncome - totalExpenses
   const savingsRate = totalIncome > 0 ? Math.round((balance / totalIncome) * 100) : 0
+
+  const onIncomeEnter = (_, index) => {
+    setActiveIncomeIndex(index)
+  }
+
+  const onExpenseEnter = (_, index) => {
+    setActiveExpenseIndex(index)
+  }
 
   if (loading) {
     return <div className="py-10 text-center">Loading report data...</div>
@@ -158,6 +258,7 @@ export function MonthlyReport() {
                       tickFormatter={(value) => `$${value}`}
                     />
                     <Tooltip
+                      content={<CustomTooltip />}
                       formatter={(value) => [`$${value.toFixed(2)}`, ""]}
                       labelFormatter={(label) => `Day: ${label}`}
                     />
@@ -187,20 +288,24 @@ export function MonthlyReport() {
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
+                        activeIndex={activeIncomeIndex}
+                        activeShape={renderActiveShape}
                         data={reportData.income}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
+                        label={renderCustomizedLabel}
                         outerRadius={100}
                         fill="#8884d8"
                         dataKey="amount"
                         nameKey="category"
+                        onMouseEnter={onIncomeEnter}
                       >
                         {reportData.income.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => [`$${Number(value).toFixed(2)}`, ""]} />
+                      <Tooltip content={<CustomTooltip />} />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
@@ -228,7 +333,9 @@ export function MonthlyReport() {
                           />
                           <span>{item.category}</span>
                         </div>
-                        <div className="font-medium">${Number(item.amount).toFixed(2)}</div>
+                        <div className="font-medium">
+                          ${Number(item.amount).toFixed(2)} ({(item.percent * 100).toFixed(1)}%)
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -254,20 +361,24 @@ export function MonthlyReport() {
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
+                        activeIndex={activeExpenseIndex}
+                        activeShape={renderActiveShape}
                         data={reportData.expenses}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
+                        label={renderCustomizedLabel}
                         outerRadius={100}
                         fill="#8884d8"
                         dataKey="amount"
                         nameKey="category"
+                        onMouseEnter={onExpenseEnter}
                       >
                         {reportData.expenses.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => [`$${Number(value).toFixed(2)}`, ""]} />
+                      <Tooltip content={<CustomTooltip />} />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
@@ -295,7 +406,9 @@ export function MonthlyReport() {
                           />
                           <span>{item.category}</span>
                         </div>
-                        <div className="font-medium">${Number(item.amount).toFixed(2)}</div>
+                        <div className="font-medium">
+                          ${Number(item.amount).toFixed(2)} ({(item.percent * 100).toFixed(1)}%)
+                        </div>
                       </div>
                     ))}
                   </div>
