@@ -5,6 +5,7 @@ import Sidebar from "@/components/sidebar"
 import Header from "@/components/header"
 import { ConnectionStatus } from "@/components/connection-status"
 import { TechBackground } from "@/components/tech-background"
+import { ScrollHeaderEffect } from "@/components/scroll-header-effect"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -23,9 +24,10 @@ export default function RootLayout({ children }) {
           <div className="flex min-h-screen flex-col dark:bg-background dark:text-foreground">
             <TechBackground />
             <Header />
-            <div className="flex flex-1">
+            <ScrollHeaderEffect />
+            <div className="flex flex-1 pt-0">
               <Sidebar />
-              <main className="flex-1 p-6 pt-16 md:p-8 md:pt-6">{children}</main>
+              <main className="flex-1 container px-4 py-6 md:px-6 md:py-8">{children}</main>
             </div>
           </div>
           <ConnectionStatus />

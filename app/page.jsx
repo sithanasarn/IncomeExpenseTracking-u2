@@ -40,7 +40,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 mt-4">
       <DashboardCards />
 
       <Tabs defaultValue="overview" className="space-y-4">

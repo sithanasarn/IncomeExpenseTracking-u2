@@ -118,3 +118,37 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--primary));
 }
+
+/* Layout adjustments */
+@media (min-width: 768px) {
+  main {
+    margin-left: 16rem; /* 256px (sidebar width) */
+  }
+}
+
+/* Fix for mobile layout */
+@media (max-width: 767px) {
+  main {
+    padding-top: 1rem;
+  }
+}
+
+/* Ensure content doesn't get hidden under the header */
+.content-area {
+  padding-top: 4rem;
+}
+
+/* Improve header appearance */
+header {
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+header.scrolled {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Improve mobile menu */
+.mobile-menu-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
