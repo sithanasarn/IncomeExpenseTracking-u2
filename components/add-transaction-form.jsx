@@ -17,6 +17,8 @@ import { useForm } from "react-hook-form"
 import { getSupabaseClient } from "@/lib/supabase"
 import Image from "next/image"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+// Import the new utility function at the top of the file
+import { ensureStorageBucketExists } from "@/lib/storage-utils"
 
 // Maximum file size (3MB)
 const MAX_FILE_SIZE = 3 * 1024 * 1024
@@ -138,7 +140,7 @@ export function AddTransactionForm() {
     }
   }
 
-  // Upload image to Supabase Storage
+  // Update the uploadImage function to check for and create the bucket if needed
   const uploadImage = async (file) => {
     try {
       setUploadError(null)
@@ -147,6 +149,18 @@ export function AddTransactionForm() {
         throw new Error("Supabase client not initialized")
       }
 
+      // First, ensure the bucket exists
+      setUploadProgress(5) // Show some initial progress
+      setDebugInfo(`Checking if storage bucket exists...`)
+
+      const { success: bucketSuccess, message: bucketMessage } = await ensureStorageBucketExists("transaction-receipts")
+
+      if (!bucketSuccess) {
+        throw new Error(`Storage bucket issue: ${bucketMessage}`)
+      }
+
+      setDebugInfo((prev) => `${prev}\n${bucketMessage}`)
+
       // Create a unique file name
       const fileExt = file.name.split(".").pop()
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`
@@ -154,7 +168,7 @@ export function AddTransactionForm() {
 
       console.log("Uploading file:", filePath)
       setUploadProgress(10) // Start progress
-      setDebugInfo(`Starting upload of ${file.name} (${(file.size / 1024).toFixed(2)} KB)`)
+      setDebugInfo((prev) => `${prev}\nStarting upload of ${file.name} (${(file.size / 1024).toFixed(2)} KB)`)
 
       // Upload the file
       const { data, error } = await supabase.storage.from("transaction-receipts").upload(filePath, file, {
