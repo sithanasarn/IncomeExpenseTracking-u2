@@ -16,6 +16,15 @@ BEGIN
         -- Insert the bucket
         INSERT INTO storage.buckets (id, name, public)
         VALUES ('transaction-receipts', 'transaction-receipts', true);
+        
+        RAISE NOTICE 'Created transaction-receipts bucket';
+    ELSE
+        -- Update the bucket to ensure it's public
+        UPDATE storage.buckets 
+        SET public = true 
+        WHERE name = 'transaction-receipts';
+        
+        RAISE NOTICE 'Updated transaction-receipts bucket to be public';
     END IF;
 END $$;
 
@@ -34,6 +43,8 @@ BEGIN
         ON storage.objects FOR INSERT
         TO public
         WITH CHECK (bucket_id = 'transaction-receipts');
+        
+        RAISE NOTICE 'Created upload policy for transaction-receipts';
     END IF;
 END $$;
 
@@ -50,6 +61,8 @@ BEGIN
         ON storage.objects FOR SELECT
         TO public
         USING (bucket_id = 'transaction-receipts');
+        
+        RAISE NOTICE 'Created download policy for transaction-receipts';
     END IF;
 END $$;
 
@@ -66,6 +79,8 @@ BEGIN
         ON storage.objects FOR UPDATE
         TO public
         USING (bucket_id = 'transaction-receipts');
+        
+        RAISE NOTICE 'Created update policy for transaction-receipts';
     END IF;
 END $$;
 
@@ -82,5 +97,31 @@ BEGIN
         ON storage.objects FOR DELETE
         TO public
         USING (bucket_id = 'transaction-receipts');
+        
+        RAISE NOTICE 'Created delete policy for transaction-receipts';
     END IF;
 END $$;
+
+-- Ensure RLS is enabled on the objects table
+ALTER TABLE IF EXISTS storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Output current bucket configuration
+SELECT name, public FROM storage.buckets WHERE name = 'transaction-receipts';
+
+-- Output current policies
+SELECT 
+    p.policyname, 
+    CASE
+        WHEN p.cmd = 'r' THEN 'SELECT'
+        WHEN p.cmd = 'a' THEN 'INSERT'
+        WHEN p.cmd = 'w' THEN 'UPDATE'
+        WHEN p.cmd = 'd' THEN 'DELETE'
+        ELSE p.cmd::TEXT
+    END AS operation,
+    pg_get_expr(p.qual, p.polrelid) AS definition
+FROM pg_policy p
+JOIN pg_class c ON p.polrelid = c.oid
+JOIN pg_namespace n ON c.relnamespace = n.oid
+WHERE n.nspname = 'storage'
+  AND c.relname = 'objects'
+  AND pg_get_expr(p.qual, p.polrelid) LIKE '%transaction-receipts%';

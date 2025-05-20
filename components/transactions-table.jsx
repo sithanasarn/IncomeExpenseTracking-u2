@@ -211,7 +211,7 @@ export function TransactionsTable() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="text-emerald-500 hover:text-emerald-400"
+                        className="text-emerald-500 hover:text-emerald-400 relative"
                         onClick={() => viewTransactionDetails(transaction)}
                       >
                         <ImageIcon className="h-4 w-4" />
@@ -286,9 +286,8 @@ export function TransactionsTable() {
                 <p className="text-sm font-medium text-muted-foreground">Description</p>
                 <p>{selectedTransaction.description}</p>
               </div>
-              {selectedTransaction.receipt_image && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Receipt Image</p>
+              {selectedTransaction?.receipt_image && (
+                <div className="space-y-4">
                   <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md border border-[#2a2a3c]">
                     <Image
                       src={selectedTransaction.receipt_image || "/placeholder.svg"}
@@ -296,8 +295,15 @@ export function TransactionsTable() {
                       fill
                       className="object-contain"
                       sizes="(max-width: 768px) 100vw, 400px"
+                      onError={(e) => {
+                        console.error("Image failed to load:", selectedTransaction.receipt_image)
+                        e.currentTarget.src = "/placeholder.svg"
+                      }}
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground break-all">
+                    Image URL: {selectedTransaction.receipt_image}
+                  </p>
                 </div>
               )}
             </div>

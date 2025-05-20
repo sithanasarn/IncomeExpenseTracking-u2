@@ -87,8 +87,9 @@ export function AddTransactionForm() {
     const file = e.target.files[0]
     if (!file) return
 
-    // Reset previous errors
+    // Reset previous errors and progress
     setUploadError(null)
+    setUploadProgress(0)
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
@@ -118,6 +119,12 @@ export function AddTransactionForm() {
       setImagePreview(e.target.result)
     }
     reader.readAsDataURL(file)
+
+    // Show success toast
+    toast({
+      title: "File selected",
+      description: `${file.name} (${(file.size / 1024).toFixed(1)} KB) ready to upload`,
+    })
   }
 
   // Clear selected image
@@ -147,31 +154,36 @@ export function AddTransactionForm() {
 
       console.log("Uploading file:", filePath)
       setUploadProgress(10) // Start progress
-
-      // Try to create the bucket if it doesn't exist (this might fail due to permissions)
-      try {
-        await supabase.storage.createBucket("transaction-receipts", {
-          public: true,
-          fileSizeLimit: 3000000, // 3MB
-        })
-      } catch (err) {
-        console.log("Bucket might already exist or insufficient permissions:", err)
-        // Continue anyway as the bucket might already exist
-      }
+      setDebugInfo(`Starting upload of ${file.name} (${(file.size / 1024).toFixed(2)} KB)`)
 
       // Upload the file
       const { data, error } = await supabase.storage.from("transaction-receipts").upload(filePath, file, {
         cacheControl: "3600",
-        upsert: true, // Changed to true to overwrite if file exists
+        upsert: true,
         onUploadProgress: (progress) => {
           const percent = Math.round((progress.loaded / progress.total) * 100)
           console.log(`Upload progress: ${percent}%`)
           setUploadProgress(percent)
+
+          // Update debug info with progress
+          setDebugInfo(
+            (prev) =>
+              `${prev || ""}\nUploading: ${percent}% (${(progress.loaded / 1024).toFixed(1)}/${(progress.total / 1024).toFixed(1)} KB)`,
+          )
+
+          // Show toast at 100% completion
+          if (percent === 100) {
+            toast({
+              title: "Upload complete",
+              description: `${file.name} has been uploaded successfully`,
+            })
+          }
         },
       })
 
       if (error) {
         console.error("Upload error:", error)
+        setDebugInfo(`Upload error: ${error.message}`)
         throw error
       }
 
@@ -180,11 +192,30 @@ export function AddTransactionForm() {
       // Get the public URL
       const { data: urlData } = supabase.storage.from("transaction-receipts").getPublicUrl(filePath)
 
-      console.log("Upload successful, URL:", urlData.publicUrl)
-      return urlData.publicUrl
+      if (!urlData || !urlData.publicUrl) {
+        throw new Error("Failed to get public URL for uploaded file")
+      }
+
+      const publicUrl = urlData.publicUrl
+      console.log("Upload successful, URL:", publicUrl)
+      setDebugInfo(`Upload successful! URL: ${publicUrl}`)
+
+      // Test if the URL is accessible
+      try {
+        const testResponse = await fetch(publicUrl, { method: "HEAD" })
+        if (!testResponse.ok) {
+          console.warn("Image URL may not be accessible:", publicUrl)
+          setDebugInfo((prev) => `${prev}\nWarning: Image URL may not be accessible. Status: ${testResponse.status}`)
+        }
+      } catch (testError) {
+        console.warn("Could not verify image URL accessibility:", testError)
+      }
+
+      return publicUrl
     } catch (error) {
       console.error("Error uploading image:", error)
       setUploadError(error.message || "Failed to upload image")
+      setDebugInfo((prev) => `${prev}\nError: ${error.message}`)
       throw error
     }
   }
@@ -446,6 +477,10 @@ export function AddTransactionForm() {
                       fill
                       className="object-contain"
                       sizes="(max-width: 768px) 100vw, 400px"
+                      onError={(e) => {
+                        console.error("Preview image failed to load")
+                        e.currentTarget.src = "/placeholder.svg"
+                      }}
                     />
                     <Button
                       type="button"
@@ -457,17 +492,48 @@ export function AddTransactionForm() {
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  {uploadProgress > 0 && (
-                    <div className="w-full bg-gray-700 rounded-full h-2.5 mt-2">
-                      <div
-                        className="bg-emerald-500 h-2.5 rounded-full transition-all duration-300"
-                        style={{ width: `${uploadProgress}%` }}
-                      ></div>
-                      <p className="text-xs text-center mt-1">
-                        {uploadProgress < 100 ? `Uploading: ${uploadProgress}%` : "Upload complete"}
-                      </p>
+
+                  {/* File information and upload status */}
+                  <div className="mt-2 p-3 bg-[#13131a] rounded-md border border-[#2a2a3c]">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 rounded-full bg-emerald-900/30 border border-emerald-500 flex items-center justify-center mr-2">
+                          <Upload className="h-4 w-4 text-emerald-400" />
+                        </div>
+                        <div className="overflow-hidden">
+                          <p className="font-medium text-sm truncate" title={receiptImage?.name}>
+                            {receiptImage?.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {receiptImage ? `${(receiptImage.size / 1024).toFixed(1)} KB` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        {uploadProgress === 0 && <span className="text-xs text-muted-foreground">Ready to upload</span>}
+                        {uploadProgress === 100 && <span className="text-xs text-emerald-400">Upload complete</span>}
+                        {uploadProgress > 0 && uploadProgress < 100 && (
+                          <span className="text-xs text-blue-400">Uploading...</span>
+                        )}
+                      </div>
                     </div>
-                  )}
+
+                    {/* Progress bar */}
+                    {uploadProgress > 0 && (
+                      <div className="w-full bg-gray-700 rounded-full h-2.5">
+                        <div
+                          className="bg-emerald-500 h-2.5 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                        <div className="flex justify-between items-center mt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {uploadProgress < 100 ? "Uploading to Supabase storage..." : "Ready to submit"}
+                          </p>
+                          <p className="text-xs font-medium">{uploadProgress}%</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {uploadError && (
                     <Alert variant="destructive" className="mt-2">

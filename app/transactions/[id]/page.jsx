@@ -240,7 +240,14 @@ export default function TransactionDetailPage({ params }) {
                     fill
                     className="object-contain"
                     sizes="(max-width: 768px) 100vw, 400px"
+                    onError={(e) => {
+                      console.error("Image failed to load:", transaction.receipt_image)
+                      e.currentTarget.src = "/placeholder.svg"
+                    }}
                   />
+                </div>
+                <div className="mt-2 p-2 bg-[#13131a] rounded-md">
+                  <p className="text-xs text-muted-foreground break-all">Image URL: {transaction.receipt_image}</p>
                 </div>
               </div>
             )}
