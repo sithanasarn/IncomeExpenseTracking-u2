@@ -58,11 +58,11 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile Navigation Menu - using a simple approach instead of Radix UI Sheet */}
+      {/* Mobile Navigation Menu - Fixed z-index issue */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-[9999] md:hidden">
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
-          <div className="fixed inset-y-0 left-0 w-full max-w-xs mobile-menu">
+          <div className="fixed inset-y-0 left-0 w-full max-w-xs mobile-menu z-[10000]">
             <MobileNav onNavigation={closeMobileMenu} />
           </div>
         </div>

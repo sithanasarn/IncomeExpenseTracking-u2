@@ -6,3 +6,15 @@ SELECT create_storage_bucket('transaction-receipts', 'Public bucket for transact
 UPDATE storage.buckets 
 SET public = true 
 WHERE name = 'transaction-receipts';
+
+-- Create a policy to allow uploads
+CREATE POLICY "Allow public uploads to transaction-receipts"
+ON storage.objects FOR INSERT
+TO public
+WITH CHECK (bucket_id = 'transaction-receipts');
+
+-- Create a policy to allow downloads
+CREATE POLICY "Allow public downloads from transaction-receipts"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'transaction-receipts');

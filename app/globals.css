@@ -151,6 +151,7 @@ header.scrolled {
 /* Mobile menu animation */
 .mobile-menu {
   animation: slideIn 0.3s ease forwards;
+  z-index: 99999 !important;
 }
 
 @keyframes slideIn {
@@ -207,4 +208,19 @@ header.scrolled {
 
 .mobile-menu-button:active {
   transform: scale(0.95);
+}
+
+/* Fix z-index for mobile menu */
+.fixed.inset-0.z-\[9999\] {
+  z-index: 99999 !important;
+}
+
+/* Ensure mobile menu is above everything */
+.mobile-menu {
+  z-index: 999999 !important;
+}
+
+/* Fix for upload progress bar */
+.upload-progress {
+  transition: width 0.3s ease;
 }

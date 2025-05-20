@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { CalendarIcon, CheckIcon, ChevronsUpDown, Upload, X } from "lucide-react"
+import { CalendarIcon, CheckIcon, ChevronsUpDown, Upload, X, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,7 @@ import { toast } from "@/components/ui/use-toast"
 import { useForm } from "react-hook-form"
 import { getSupabaseClient } from "@/lib/supabase"
 import Image from "next/image"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // Maximum file size (3MB)
 const MAX_FILE_SIZE = 3 * 1024 * 1024
@@ -31,6 +32,7 @@ export function AddTransactionForm() {
   const [receiptImage, setReceiptImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadError, setUploadError] = useState(null)
   const fileInputRef = useRef(null)
 
   // Initialize the form
@@ -85,6 +87,9 @@ export function AddTransactionForm() {
     const file = e.target.files[0]
     if (!file) return
 
+    // Reset previous errors
+    setUploadError(null)
+
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       toast({
@@ -119,6 +124,8 @@ export function AddTransactionForm() {
   const clearImage = () => {
     setReceiptImage(null)
     setImagePreview(null)
+    setUploadError(null)
+    setUploadProgress(0)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -127,9 +134,25 @@ export function AddTransactionForm() {
   // Upload image to Supabase Storage
   const uploadImage = async (file) => {
     try {
+      setUploadError(null)
       const supabase = getSupabaseClient()
       if (!supabase) {
         throw new Error("Supabase client not initialized")
+      }
+
+      // Check if storage bucket exists
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
+
+      if (bucketsError) {
+        console.error("Error checking storage buckets:", bucketsError)
+        throw new Error("Could not access storage. Please try again.")
+      }
+
+      const bucketExists = buckets.some((bucket) => bucket.name === "transaction-receipts")
+
+      if (!bucketExists) {
+        console.error("Storage bucket 'transaction-receipts' does not exist")
+        throw new Error("Storage not properly configured. Please contact support.")
       }
 
       // Create a unique file name
@@ -137,41 +160,68 @@ export function AddTransactionForm() {
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`
       const filePath = `receipts/${fileName}`
 
+      console.log("Uploading file:", filePath)
+      setUploadProgress(10) // Start progress
+
       // Upload the file
       const { data, error } = await supabase.storage.from("transaction-receipts").upload(filePath, file, {
         cacheControl: "3600",
         upsert: false,
         onUploadProgress: (progress) => {
-          setUploadProgress(Math.round((progress.loaded / progress.total) * 100))
+          const percent = Math.round((progress.loaded / progress.total) * 100)
+          console.log(`Upload progress: ${percent}%`)
+          setUploadProgress(percent)
         },
       })
 
       if (error) {
+        console.error("Upload error:", error)
         throw error
       }
+
+      setUploadProgress(100) // Complete progress
 
       // Get the public URL
       const { data: urlData } = supabase.storage.from("transaction-receipts").getPublicUrl(filePath)
 
+      console.log("Upload successful, URL:", urlData.publicUrl)
       return urlData.publicUrl
     } catch (error) {
       console.error("Error uploading image:", error)
+      setUploadError(error.message || "Failed to upload image")
       throw error
     }
   }
 
   const onSubmit = async (values) => {
-    setLoading(true)
-    setUploadProgress(0)
-
     try {
+      setLoading(true)
+      setUploadProgress(0)
+      setUploadError(null)
+
+      console.log("Form submission started")
       let receiptImageUrl = null
 
       // Upload image if selected
       if (receiptImage) {
-        receiptImageUrl = await uploadImage(receiptImage)
+        console.log("Uploading receipt image...")
+        try {
+          receiptImageUrl = await uploadImage(receiptImage)
+          console.log("Image uploaded successfully:", receiptImageUrl)
+        } catch (error) {
+          console.error("Image upload failed:", error)
+          setUploadError(error.message || "Failed to upload image")
+          toast({
+            title: "Image Upload Failed",
+            description: error.message || "Failed to upload receipt image. Please try again.",
+            variant: "destructive",
+          })
+          setLoading(false)
+          return // Stop form submission if image upload fails
+        }
       }
 
+      console.log("Submitting transaction data...")
       const response = await fetch("/api/transactions", {
         method: "POST",
         headers: {
@@ -188,9 +238,11 @@ export function AddTransactionForm() {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to add transaction")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to add transaction")
       }
 
+      console.log("Transaction added successfully")
       toast({
         title: "Transaction added",
         description: "Your transaction has been successfully recorded.",
@@ -218,7 +270,6 @@ export function AddTransactionForm() {
       })
     } finally {
       setLoading(false)
-      setUploadProgress(0)
     }
   }
 
@@ -392,10 +443,22 @@ export function AddTransactionForm() {
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  {uploadProgress > 0 && uploadProgress < 100 && (
+                  {uploadProgress > 0 && (
                     <div className="w-full bg-gray-700 rounded-full h-2.5 mt-2">
-                      <div className="bg-emerald-500 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+                      <div
+                        className="bg-emerald-500 h-2.5 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                      <p className="text-xs text-center mt-1">
+                        {uploadProgress < 100 ? `Uploading: ${uploadProgress}%` : "Upload complete"}
+                      </p>
                     </div>
+                  )}
+
+                  {uploadError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{uploadError}</AlertDescription>
+                    </Alert>
                   )}
                 </div>
               )}
@@ -435,10 +498,10 @@ export function AddTransactionForm() {
           className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium py-2 px-4 rounded-md transition-all duration-200 neon-glow"
         >
           {loading ? (
-            <>
-              <span className="animate-pulse mr-2">Uploading...</span>
-              {uploadProgress > 0 && `${uploadProgress}%`}
-            </>
+            <div className="flex items-center justify-center">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {uploadProgress > 0 && uploadProgress < 100 ? `Uploading... ${uploadProgress}%` : "Processing..."}
+            </div>
           ) : (
             "Add Transaction"
           )}
