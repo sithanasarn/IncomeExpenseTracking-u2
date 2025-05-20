@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase, uploadFile, getFileUrl } from "@/utils/supabase";
+import { supabase, uploadFile, getFileUrl } from "@/lib/supabase";
 import { v4 as uuidv4 } from "uuid";
 
 export async function POST(request) {
