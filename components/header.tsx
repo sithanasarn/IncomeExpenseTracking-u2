@@ -6,7 +6,7 @@ import { Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { ModeToggle } from "@/components/mode-toggle"
-import Sidebar from "@/components/sidebar"
+import { MobileSidebar } from "@/components/mobile-sidebar"
 
 export default function Header() {
   const pathname = usePathname()
@@ -21,8 +21,8 @@ export default function Header() {
               <span className="sr-only">Toggle Menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0">
-            <Sidebar />
+          <SheetContent side="left" className="p-0 w-[280px] border-r border-[#2a2a3c] dark:bg-[#0f1015]">
+            <MobileSidebar />
           </SheetContent>
         </Sheet>
         <div className="flex items-center justify-between w-full">

@@ -130,6 +130,7 @@
 @media (max-width: 767px) {
   main {
     padding-top: 1rem;
+    margin-left: 0;
   }
 }
 
@@ -189,4 +190,25 @@ header.scrolled {
 /* Override recharts legend text color */
 .recharts-legend-item-text {
   color: white !important;
+}
+
+/* Mobile menu fixes */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+/* Fix for mobile sheet */
+.fixed.inset-0.z-50 {
+  z-index: 9999 !important;
+}
+
+/* Ensure mobile menu is visible */
+[data-state="open"] {
+  display: block !important;
+}
+
+/* Fix for sheet content */
+[data-radix-dialog-content] {
+  max-height: 100vh !important;
+  overflow-y: auto !important;
 }
