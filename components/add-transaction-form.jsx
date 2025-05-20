@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { CalendarIcon, CheckIcon, ChevronsUpDown, Upload, X, Loader2 } from "lucide-react"
+import { CalendarIcon, CheckIcon, ChevronsUpDown, Upload, X, Loader2, AlertCircle } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -14,11 +14,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
 import { useForm } from "react-hook-form"
-import { getSupabaseClient } from "@/lib/supabase"
 import Image from "next/image"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-// Import the new utility function at the top of the file
-import { ensureStorageBucketExists } from "@/lib/storage-utils"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+// Import the new utility function
+import { uploadFileToStorage } from "@/lib/storage-utils"
 
 // Maximum file size (3MB)
 const MAX_FILE_SIZE = 3 * 1024 * 1024
@@ -92,6 +91,7 @@ export function AddTransactionForm() {
     // Reset previous errors and progress
     setUploadError(null)
     setUploadProgress(0)
+    setDebugInfo(null)
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
@@ -135,97 +135,37 @@ export function AddTransactionForm() {
     setImagePreview(null)
     setUploadError(null)
     setUploadProgress(0)
+    setDebugInfo(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
   }
 
-  // Update the uploadImage function to check for and create the bucket if needed
+  // Upload image using the improved utility function
   const uploadImage = async (file) => {
     try {
       setUploadError(null)
-      const supabase = getSupabaseClient()
-      if (!supabase) {
-        throw new Error("Supabase client not initialized")
+      setDebugInfo("Starting upload process...")
+
+      // Use the new upload utility function
+      const result = await uploadFileToStorage(
+        file,
+        "transaction-receipts",
+        (progress) => setUploadProgress(progress),
+        (debug) => setDebugInfo((prev) => `${prev}\n${debug}`),
+      )
+
+      if (!result.success) {
+        throw new Error(result.message)
       }
 
-      // First, ensure the bucket exists
-      setUploadProgress(5) // Show some initial progress
-      setDebugInfo(`Checking if storage bucket exists...`)
-
-      const { success: bucketSuccess, message: bucketMessage } = await ensureStorageBucketExists("transaction-receipts")
-
-      if (!bucketSuccess) {
-        throw new Error(`Storage bucket issue: ${bucketMessage}`)
-      }
-
-      setDebugInfo((prev) => `${prev}\n${bucketMessage}`)
-
-      // Create a unique file name
-      const fileExt = file.name.split(".").pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-      const filePath = `receipts/${fileName}`
-
-      console.log("Uploading file:", filePath)
-      setUploadProgress(10) // Start progress
-      setDebugInfo((prev) => `${prev}\nStarting upload of ${file.name} (${(file.size / 1024).toFixed(2)} KB)`)
-
-      // Upload the file
-      const { data, error } = await supabase.storage.from("transaction-receipts").upload(filePath, file, {
-        cacheControl: "3600",
-        upsert: true,
-        onUploadProgress: (progress) => {
-          const percent = Math.round((progress.loaded / progress.total) * 100)
-          console.log(`Upload progress: ${percent}%`)
-          setUploadProgress(percent)
-
-          // Update debug info with progress
-          setDebugInfo(
-            (prev) =>
-              `${prev || ""}\nUploading: ${percent}% (${(progress.loaded / 1024).toFixed(1)}/${(progress.total / 1024).toFixed(1)} KB)`,
-          )
-
-          // Show toast at 100% completion
-          if (percent === 100) {
-            toast({
-              title: "Upload complete",
-              description: `${file.name} has been uploaded successfully`,
-            })
-          }
-        },
+      // Show success toast
+      toast({
+        title: "Upload complete",
+        description: `${file.name} has been uploaded successfully`,
       })
 
-      if (error) {
-        console.error("Upload error:", error)
-        setDebugInfo(`Upload error: ${error.message}`)
-        throw error
-      }
-
-      setUploadProgress(100) // Complete progress
-
-      // Get the public URL
-      const { data: urlData } = supabase.storage.from("transaction-receipts").getPublicUrl(filePath)
-
-      if (!urlData || !urlData.publicUrl) {
-        throw new Error("Failed to get public URL for uploaded file")
-      }
-
-      const publicUrl = urlData.publicUrl
-      console.log("Upload successful, URL:", publicUrl)
-      setDebugInfo(`Upload successful! URL: ${publicUrl}`)
-
-      // Test if the URL is accessible
-      try {
-        const testResponse = await fetch(publicUrl, { method: "HEAD" })
-        if (!testResponse.ok) {
-          console.warn("Image URL may not be accessible:", publicUrl)
-          setDebugInfo((prev) => `${prev}\nWarning: Image URL may not be accessible. Status: ${testResponse.status}`)
-        }
-      } catch (testError) {
-        console.warn("Could not verify image URL accessibility:", testError)
-      }
-
-      return publicUrl
+      return result.url
     } catch (error) {
       console.error("Error uploading image:", error)
       setUploadError(error.message || "Failed to upload image")
@@ -239,7 +179,7 @@ export function AddTransactionForm() {
       setLoading(true)
       setUploadProgress(0)
       setUploadError(null)
-      setDebugInfo(null)
+      setDebugInfo("Form submission started...")
 
       console.log("Form submission started with values:", values)
       let receiptImageUrl = null
@@ -282,6 +222,7 @@ export function AddTransactionForm() {
       }
 
       console.log("Submitting transaction data:", transactionData)
+      setDebugInfo((prev) => `${prev}\nSubmitting transaction data...`)
 
       // Submit the transaction
       const response = await fetch("/api/transactions", {
@@ -299,7 +240,7 @@ export function AddTransactionForm() {
       }
 
       console.log("Transaction added successfully:", responseData)
-      setDebugInfo("Transaction added successfully: " + JSON.stringify(responseData))
+      setDebugInfo((prev) => `${prev}\nTransaction added successfully!`)
 
       toast({
         title: "Transaction added",
@@ -321,7 +262,7 @@ export function AddTransactionForm() {
       router.refresh()
     } catch (error) {
       console.error("Error adding transaction:", error)
-      setDebugInfo("Error: " + error.message)
+      setDebugInfo((prev) => `${prev}\nError: ${error.message}`)
       toast({
         title: "Error",
         description: `Failed to add transaction: ${error.message}`,
@@ -551,6 +492,8 @@ export function AddTransactionForm() {
 
                   {uploadError && (
                     <Alert variant="destructive" className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Upload Error</AlertTitle>
                       <AlertDescription>{uploadError}</AlertDescription>
                     </Alert>
                   )}
@@ -601,10 +544,11 @@ export function AddTransactionForm() {
           )}
         </Button>
 
-        {/* Debug info - will be hidden in production */}
+        {/* Debug info with better formatting */}
         {debugInfo && (
-          <div className="mt-4 p-2 bg-gray-800 rounded text-xs text-gray-300 overflow-auto max-h-32">
-            <pre>{debugInfo}</pre>
+          <div className="mt-4 p-3 bg-[#13131a] border border-[#2a2a3c] rounded-md text-xs text-gray-300 overflow-auto max-h-48">
+            <h4 className="font-medium mb-1 text-emerald-400">Debug Information</h4>
+            <pre className="whitespace-pre-wrap">{debugInfo}</pre>
           </div>
         )}
       </form>
