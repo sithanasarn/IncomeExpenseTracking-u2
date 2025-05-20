@@ -1,97 +1,78 @@
-import { getSupabaseClient } from "@/lib/supabase"
-import { NextResponse } from "next/server"
+import { NextResponse } from "next/server";
+import { supabase, uploadFile, getFileUrl } from "@/utils/supabase";
+import { v4 as uuidv4 } from "uuid";
 
-// Get all transactions
-export async function GET() {
-  try {
-    const supabase = getSupabaseClient()
-
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Database connection not available. Check your environment configuration." },
-        { status: 503 },
-      )
-    }
-
-    console.log("Fetching all transactions...")
-
-    const { data, error } = await supabase
-      .from("transactions")
-      .select(`
-        *,
-        categories (
-          id,
-          name
-        )
-      `)
-      .order("date", { ascending: false })
-
-    if (error) {
-      console.error("Supabase error fetching transactions:", error)
-      return NextResponse.json({ error: `Transactions error: ${error.message}` }, { status: 500 })
-    }
-
-    // Return empty array if no data to avoid null errors
-    return NextResponse.json(data || [])
-  } catch (error) {
-    console.error("Server error in transactions API:", error)
-    return NextResponse.json({ error: `Server error: ${error.message}` }, { status: 500 })
-  }
-}
-
-// Create a new transaction
 export async function POST(request) {
   try {
-    const supabase = getSupabaseClient()
-
-    if (!supabase) {
+    const formData = await request.formData();
+    
+    const type = formData.get("type");
+    const amount = parseFloat(formData.get("amount"));
+    const category = formData.get("category");
+    const date = formData.get("date");
+    const notes = formData.get("notes");
+    const receiptImage = formData.get("receiptImage");
+    
+    // Validate the required fields
+    if (!type || !amount || !category || !date) {
       return NextResponse.json(
-        { error: "Database connection not available. Check your environment configuration." },
-        { status: 503 },
-      )
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
-
-    const body = await request.json()
-    console.log("Received transaction data:", body)
-
-    // Validate required fields
-    if (!body.amount || !body.type || !body.description) {
-      return NextResponse.json(
-        { error: "Missing required fields: amount, type, and description are required" },
-        { status: 400 },
-      )
-    }
-
-    // Insert transaction with or without receipt_image
+    
+    // Prepare transaction data
     const transactionData = {
-      amount: body.amount,
-      type: body.type,
-      description: body.description,
-      date: body.date,
+      type,
+      amount,
+      category,
+      date,
+      notes: notes || "",
+    };
+    
+    // Handle receipt image upload if provided
+    if (receiptImage && receiptImage.size > 0) {
+      const BUCKET_NAME = "transaction-receipts";
+      const timestamp = Date.now();
+      const fileExt = receiptImage.name.split(".").pop();
+      const fileName = `${timestamp}-${uuidv4().substring(0, 12)}.${fileExt}`;
+      const filePath = `receipts/${fileName}`;
+      
+      try {
+        console.log(`Uploading file to ${BUCKET_NAME}/${filePath}`);
+        // Upload file to Supabase storage
+        await uploadFile(BUCKET_NAME, filePath, receiptImage);
+        
+        // Get the public URL
+        const receiptUrl = getFileUrl(BUCKET_NAME, filePath);
+        console.log(`File uploaded successfully, URL: ${receiptUrl}`);
+        transactionData.receipt_url = receiptUrl;
+      } catch (error) {
+        console.error("Error uploading receipt:", error);
+        // Continue with transaction creation even if image upload fails
+      }
     }
-
-    // Only add category_id if it exists and is not empty
-    if (body.category_id && body.category_id.trim() !== "") {
-      transactionData.category_id = body.category_id
-    }
-
-    // Only add receipt_image if it exists
-    if (body.receipt_image) {
-      transactionData.receipt_image = body.receipt_image
-    }
-
-    console.log("Inserting transaction:", transactionData)
-    const { data, error } = await supabase.from("transactions").insert([transactionData]).select()
-
+    
+    // Insert transaction into database
+    const { data, error } = await supabase
+      .from("transactions")
+      .insert(transactionData)
+      .select();
+    
     if (error) {
-      console.error("Error adding transaction:", error)
-      return NextResponse.json({ error: `Add transaction error: ${error.message}` }, { status: 500 })
+      console.error("Error inserting transaction:", error);
+      return NextResponse.json(
+        { error: "Failed to create transaction" },
+        { status: 500 }
+      );
     }
-
-    console.log("Transaction added successfully:", data[0])
-    return NextResponse.json(data[0])
+    
+    return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error) {
-    console.error("Server error in POST transactions:", error)
-    return NextResponse.json({ error: `Server error: ${error.message}` }, { status: 500 })
+    console.error("Server error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
