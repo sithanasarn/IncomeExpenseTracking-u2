@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowDownIcon, ArrowUpIcon, Trash2, AlertCircle } from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon, Trash2, AlertCircle, ImageIcon, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { toast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import Image from "next/image"
 
 export function TransactionsTable() {
   const [transactions, setTransactions] = useState([])
@@ -16,6 +18,7 @@ export function TransactionsTable() {
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [selectedTransaction, setSelectedTransaction] = useState(null)
 
   useEffect(() => {
     fetchTransactions()
@@ -94,6 +97,10 @@ export function TransactionsTable() {
     }
   }
 
+  const viewTransactionDetails = (transaction) => {
+    setSelectedTransaction(transaction)
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -153,13 +160,14 @@ export function TransactionsTable() {
               <TableHead>Description</TableHead>
               <TableHead>Category</TableHead>
               <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="text-center">Receipt</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   No transactions found.
                 </TableCell>
               </TableRow>
@@ -198,11 +206,42 @@ export function TransactionsTable() {
                       </span>
                     </div>
                   </TableCell>
+                  <TableCell className="text-center">
+                    {transaction.receipt_image ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-emerald-500 hover:text-emerald-400"
+                        onClick={() => viewTransactionDetails(transaction)}
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                        <span className="sr-only">View Receipt</span>
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">No receipt</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(transaction.id)}>
-                      <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
-                      <span className="sr-only">Delete</span>
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => viewTransactionDetails(transaction)}
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span className="sr-only">View</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-red-500"
+                        onClick={() => handleDelete(transaction.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete</span>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -210,6 +249,61 @@ export function TransactionsTable() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Transaction Details Dialog */}
+      <Dialog open={!!selectedTransaction} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+          </DialogHeader>
+          {selectedTransaction && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Date</p>
+                  <p>
+                    {selectedTransaction.date ? new Date(selectedTransaction.date).toLocaleDateString() : "No date"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Type</p>
+                  <p className={selectedTransaction.type === "income" ? "text-emerald-400" : "text-red-400"}>
+                    {selectedTransaction.type.charAt(0).toUpperCase() + selectedTransaction.type.slice(1)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Amount</p>
+                  <p className={selectedTransaction.type === "income" ? "text-emerald-400" : "text-red-400"}>
+                    ${Number(selectedTransaction.amount || 0).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Category</p>
+                  <p>{selectedTransaction.categories?.name || "Uncategorized"}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Description</p>
+                <p>{selectedTransaction.description}</p>
+              </div>
+              {selectedTransaction.receipt_image && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Receipt Image</p>
+                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md border border-[#2a2a3c]">
+                    <Image
+                      src={selectedTransaction.receipt_image || "/placeholder.svg"}
+                      alt="Receipt"
+                      fill
+                      className="object-contain"
+                      sizes="(max-width: 768px) 100vw, 400px"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

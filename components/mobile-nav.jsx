@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Home, PlusCircle, ListOrdered } from "lucide-react"
+import { BarChart3, Home, PlusCircle, ListOrdered, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function MobileNav({ onNavigation }) {
@@ -28,6 +28,11 @@ export function MobileNav({ onNavigation }) {
       href: "/reports",
       icon: BarChart3,
       title: "Reports",
+    },
+    {
+      href: "/admin",
+      icon: Settings,
+      title: "Admin",
     },
   ]
 
