@@ -62,6 +62,7 @@ export async function POST(request) {
           description: body.description,
           category_id: body.category_id,
           date: body.date,
+          receipt_image: body.receipt_image, // Add receipt image URL
         },
       ])
       .select()
