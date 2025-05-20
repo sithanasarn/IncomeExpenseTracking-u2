@@ -52,26 +52,43 @@ export async function POST(request) {
     }
 
     const body = await request.json()
+    console.log("Received transaction data:", body)
 
-    const { data, error } = await supabase
-      .from("transactions")
-      .insert([
-        {
-          amount: body.amount,
-          type: body.type,
-          description: body.description,
-          category_id: body.category_id,
-          date: body.date,
-          receipt_image: body.receipt_image, // Add receipt image URL
-        },
-      ])
-      .select()
+    // Validate required fields
+    if (!body.amount || !body.type || !body.description) {
+      return NextResponse.json(
+        { error: "Missing required fields: amount, type, and description are required" },
+        { status: 400 },
+      )
+    }
+
+    // Insert transaction with or without receipt_image
+    const transactionData = {
+      amount: body.amount,
+      type: body.type,
+      description: body.description,
+      date: body.date,
+    }
+
+    // Only add category_id if it exists and is not empty
+    if (body.category_id && body.category_id.trim() !== "") {
+      transactionData.category_id = body.category_id
+    }
+
+    // Only add receipt_image if it exists
+    if (body.receipt_image) {
+      transactionData.receipt_image = body.receipt_image
+    }
+
+    console.log("Inserting transaction:", transactionData)
+    const { data, error } = await supabase.from("transactions").insert([transactionData]).select()
 
     if (error) {
       console.error("Error adding transaction:", error)
       return NextResponse.json({ error: `Add transaction error: ${error.message}` }, { status: 500 })
     }
 
+    console.log("Transaction added successfully:", data[0])
     return NextResponse.json(data[0])
   } catch (error) {
     console.error("Server error in POST transactions:", error)

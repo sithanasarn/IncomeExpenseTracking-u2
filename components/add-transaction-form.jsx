@@ -33,6 +33,7 @@ export function AddTransactionForm() {
   const [imagePreview, setImagePreview] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState(null)
+  const [debugInfo, setDebugInfo] = useState(null)
   const fileInputRef = useRef(null)
 
   // Initialize the form
@@ -43,7 +44,6 @@ export function AddTransactionForm() {
       description: "",
       category_id: "",
       date: new Date(),
-      receipt_image: null,
     },
   })
 
@@ -140,21 +140,6 @@ export function AddTransactionForm() {
         throw new Error("Supabase client not initialized")
       }
 
-      // Check if storage bucket exists
-      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
-
-      if (bucketsError) {
-        console.error("Error checking storage buckets:", bucketsError)
-        throw new Error("Could not access storage. Please try again.")
-      }
-
-      const bucketExists = buckets.some((bucket) => bucket.name === "transaction-receipts")
-
-      if (!bucketExists) {
-        console.error("Storage bucket 'transaction-receipts' does not exist")
-        throw new Error("Storage not properly configured. Please contact support.")
-      }
-
       // Create a unique file name
       const fileExt = file.name.split(".").pop()
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`
@@ -163,10 +148,21 @@ export function AddTransactionForm() {
       console.log("Uploading file:", filePath)
       setUploadProgress(10) // Start progress
 
+      // Try to create the bucket if it doesn't exist (this might fail due to permissions)
+      try {
+        await supabase.storage.createBucket("transaction-receipts", {
+          public: true,
+          fileSizeLimit: 3000000, // 3MB
+        })
+      } catch (err) {
+        console.log("Bucket might already exist or insufficient permissions:", err)
+        // Continue anyway as the bucket might already exist
+      }
+
       // Upload the file
       const { data, error } = await supabase.storage.from("transaction-receipts").upload(filePath, file, {
         cacheControl: "3600",
-        upsert: false,
+        upsert: true, // Changed to true to overwrite if file exists
         onUploadProgress: (progress) => {
           const percent = Math.round((progress.loaded / progress.total) * 100)
           console.log(`Upload progress: ${percent}%`)
@@ -198,8 +194,9 @@ export function AddTransactionForm() {
       setLoading(true)
       setUploadProgress(0)
       setUploadError(null)
+      setDebugInfo(null)
 
-      console.log("Form submission started")
+      console.log("Form submission started with values:", values)
       let receiptImageUrl = null
 
       // Upload image if selected
@@ -221,28 +218,44 @@ export function AddTransactionForm() {
         }
       }
 
-      console.log("Submitting transaction data...")
+      // Prepare transaction data
+      const transactionData = {
+        type: values.type,
+        amount: Number.parseFloat(values.amount),
+        description: values.description,
+        date: format(values.date, "yyyy-MM-dd"),
+      }
+
+      // Only add category_id if it's selected
+      if (values.category_id) {
+        transactionData.category_id = values.category_id
+      }
+
+      // Only add receipt_image if it was uploaded
+      if (receiptImageUrl) {
+        transactionData.receipt_image = receiptImageUrl
+      }
+
+      console.log("Submitting transaction data:", transactionData)
+
+      // Submit the transaction
       const response = await fetch("/api/transactions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          type: values.type,
-          amount: Number.parseFloat(values.amount),
-          description: values.description,
-          category_id: values.category_id,
-          date: format(values.date, "yyyy-MM-dd"),
-          receipt_image: receiptImageUrl,
-        }),
+        body: JSON.stringify(transactionData),
       })
 
+      const responseData = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || "Failed to add transaction")
+        throw new Error(responseData.error || "Failed to add transaction")
       }
 
-      console.log("Transaction added successfully")
+      console.log("Transaction added successfully:", responseData)
+      setDebugInfo("Transaction added successfully: " + JSON.stringify(responseData))
+
       toast({
         title: "Transaction added",
         description: "Your transaction has been successfully recorded.",
@@ -263,6 +276,7 @@ export function AddTransactionForm() {
       router.refresh()
     } catch (error) {
       console.error("Error adding transaction:", error)
+      setDebugInfo("Error: " + error.message)
       toast({
         title: "Error",
         description: `Failed to add transaction: ${error.message}`,
@@ -506,6 +520,13 @@ export function AddTransactionForm() {
             "Add Transaction"
           )}
         </Button>
+
+        {/* Debug info - will be hidden in production */}
+        {debugInfo && (
+          <div className="mt-4 p-2 bg-gray-800 rounded text-xs text-gray-300 overflow-auto max-h-32">
+            <pre>{debugInfo}</pre>
+          </div>
+        )}
       </form>
     </Form>
   )
