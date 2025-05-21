@@ -4,19 +4,15 @@ import { v4 as uuidv4 } from "uuid";
 
 export async function POST(request) {
   try {
-    const formData = await request.formData();
+    const body = await request.json();
     
-    const type = formData.get("type");
-    const amount = parseFloat(formData.get("amount"));
-    const category = formData.get("category");
-    const date = formData.get("date");
-    const notes = formData.get("notes");
-    const receiptImage = formData.get("receiptImage");
+    const { type, amount, category_id, date, description, receipt_image } = body;
     
     // Validate the required fields
-    if (!type || !amount || !category || !date) {
+    // category_id and receipt_image are optional
+    if (!type || !amount || !description || !date) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required fields: type, amount, description, and date are required." },
         { status: 400 }
       );
     }
@@ -24,33 +20,17 @@ export async function POST(request) {
     // Prepare transaction data
     const transactionData = {
       type,
-      amount,
-      category,
+      amount: parseFloat(amount), // Ensure amount is a number
       date,
-      notes: notes || "",
+      description: description || "", 
     };
-    
-    // Handle receipt image upload if provided
-    if (receiptImage && receiptImage.size > 0) {
-      const BUCKET_NAME = "transaction-receipts";
-      const timestamp = Date.now();
-      const fileExt = receiptImage.name.split(".").pop();
-      const fileName = `${timestamp}-${uuidv4().substring(0, 12)}.${fileExt}`;
-      const filePath = `receipts/${fileName}`;
-      
-      try {
-        console.log(`Uploading file to ${BUCKET_NAME}/${filePath}`);
-        // Upload file to Supabase storage
-        await uploadFile(BUCKET_NAME, filePath, receiptImage);
-        
-        // Get the public URL
-        const receiptUrl = getFileUrl(BUCKET_NAME, filePath);
-        console.log(`File uploaded successfully, URL: ${receiptUrl}`);
-        transactionData.receipt_url = receiptUrl;
-      } catch (error) {
-        console.error("Error uploading receipt:", error);
-        // Continue with transaction creation even if image upload fails
-      }
+
+    // Add optional fields if they exist
+    if (category_id) {
+      transactionData.category_id = category_id;
+    }
+    if (receipt_image) {
+      transactionData.receipt_image = receipt_image; // this is the URL from the client
     }
     
     // Insert transaction into database
@@ -61,6 +41,13 @@ export async function POST(request) {
     
     if (error) {
       console.error("Error inserting transaction:", error);
+      // Check for specific Supabase errors if needed, e.g., foreign key violation for category_id
+      if (error.code === '23503' && error.details.includes('category_id')) {
+        return NextResponse.json(
+          { error: "Invalid category_id provided." },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
         { error: "Failed to create transaction" },
         { status: 500 }
@@ -70,6 +57,9 @@ export async function POST(request) {
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error) {
     console.error("Server error:", error);
+    if (error instanceof SyntaxError) { // Handle JSON parsing errors
+      return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
